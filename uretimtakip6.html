@@ -1,250 +1,125 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Üretim Takip Pro v140.9</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="Üretim Takip Pro v141", layout="wide")
+
+# --- CSS: MODERLEŞTİRME ---
+st.markdown("""
     <style>
-        :root {
-            --bg: #0d1117; --card: #161b22; --input: #21262d;
-            --accent: #58a6ff; --success: #238636; --danger: #f85149; --text: #c9d1d9; --purple: #8957e5;
-        }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 1200px; }
-        .tabs { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #30363d; overflow-x: auto; scrollbar-width: none; }
-        .tab-btn { padding: 10px 15px; background: var(--input); color: #8b949e; border: none; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; }
-        .tab-btn.active { background: var(--accent); color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .card { background: var(--card); border: 1px solid #30363d; padding: 12px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        label { display: block; font-size: 10px; color: #8b949e; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
-        input { width: 100%; background: var(--input); border: 1px solid #30363d; padding: 10px; color: white; border-radius: 6px; outline: none; box-sizing: border-box; font-size: 13px; }
-        .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; text-align: center; }
-        .btn-add { background: var(--accent); color: white; margin-top: 10px; }
-        .btn-scan { background: #30363d; color: white; margin-bottom: 10px; border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .btn-finish { background: var(--purple); color: white; margin-top: 10px; }
-        .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid #30363d; margin-top: 5px; }
-        table { width: 100%; border-collapse: collapse; min-width: 650px; }
-        th { background: #21262d; padding: 8px; text-align: left; font-size: 10px; color: #8b949e; text-transform: uppercase; }
-        td { padding: 8px; border-bottom: 1px solid #30363d; font-size: 12px; }
-        .total-row { background: #1c2128; font-weight: bold; color: var(--accent); }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; display: none; margin-bottom: 15px; border: 2px solid var(--accent); background: #000; }
-        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .mini-badge { padding: 8px; background: #0d1117; border-radius: 6px; border: 1px solid #30363d; text-align: center; }
-        .archive-item { border-left: 3px solid var(--accent); margin-bottom: 8px; padding: 10px; background: var(--input); border-radius: 6px; }
-        .archive-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .btn-del-day { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
-        .details-table { margin-top: 10px; background: #0d1117; display: none; padding: 5px; border-radius: 4px; }
+    .main { background-color: #0d1117; color: #c9d1d9; }
+    div.stButton > button:first-child { background-color: #238636; color: white; width: 100%; border-radius: 8px; }
+    .stNumberInput, .stTextInput { background-color: #161b22; }
     </style>
-</head>
-<body>
+    """, unsafe_allow_html=True)
 
-<div class="container">
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('tab1', this)">🏠 ÜRETİM</button>
-        <button class="tab-btn" onclick="switchTab('tab-kayit', this); renderDbList();">🏷️ ARTIKEL</button>
-        <button class="tab-btn" onclick="switchTab('tab-arsiv', this); renderArchive();">📜 ARŞİV</button>
-        <button class="tab-btn" onclick="switchTab('tab-ayarlar', this)">⚙️ AYARLAR</button>
-    </div>
+# --- ŞİFRE KORUMASI ---
+def giris_ekrani():
+    if "auth" not in st.session_state:
+        st.session_state["auth"] = False
 
-    <div id="tab1" class="tab-content active">
-        <div class="card">
-            <div style="margin-bottom: 10px;"><label>Tarih</label><input type="date" id="targetDate"></div>
-            <div id="reader"></div>
-            <button class="btn btn-scan" id="scanBtn" onclick="toggleScanner()">📷 BARKOD TARA (AUFTRAG)</button>
+    if not st.session_state["auth"]:
+        st.title("🔐 Üretim Portalı")
+        sifre = st.text_input("Giriş Şifresini Giriniz", type="password")
+        if st.button("Sisteme Giriş Yap"):
+            if sifre == "percin123": # <--- İstediğin şifreyi buraya yaz
+                st.session_state["auth"] = True
+                st.rerun()
+            else:
+                st.error("Hatalı Şifre!")
+        return False
+    return True
 
-            <div class="grid-inputs">
-                <div style="grid-column: span 2;"><label>Auftrag No</label><input type="text" id="cArt" oninput="fetchTE(this.value)" placeholder="Barkod veya No..."></div>
-                <div><label>Adet</label><input type="text" id="cAdet" oninput="engine()"></div>
-                <div><label>TE</label><input type="text" id="cTE" oninput="engine()"></div>
-                <div><label>Verim</label><input type="text" id="cPro" oninput="engine()" placeholder=""></div>
-                <div><label>Dakika</label><input type="text" id="cRes"></div>
-                <div><label>Rüst</label><input type="number" id="cRust"></div>
-                <div><label>GMK (T53)</label><input type="number" id="cGMK"></div>
-                <input type="hidden" id="cNote">
-            </div>
-            <button class="btn btn-add" onclick="addRow()">LİSTEYE EKLE</button>
-        </div>
+if giris_ekrani():
+    # --- SESSION STATE (VERİ DEPOLAMA) ---
+    if "liste" not in st.session_state:
+        st.session_state["liste"] = []
+    if "kutuphane" not in st.session_state:
+        st.session_state["kutuphane"] = {"PERÇİN": 0.550, "Örnek İş": 0.125}
 
-        <div class="card">
-            <div class="table-wrapper">
-                <table>
-                    <thead><tr><th>AUFTRAG</th><th>NOT</th><th>ADET</th><th>TE</th><th>VER</th><th>DK</th><th>R</th><th>G</th><th>❌</th></tr></thead>
-                    <tbody id="dailyBody"></tbody>
-                    <tfoot>
-                        <tr class="total-row"><td colspan="5" style="text-align: right;">TOPLAM:</td><td id="sumRes">0,00</td><td id="sumRust">0</td><td id="sumGMK">0</td><td></td></tr>
-                    </tfoot>
-                </table>
-            </div>
-            <div class="summary-grid">
-                <div class="mini-badge"><label>HEDEF</label><input type="number" id="customTarget" value="465" oninput="calcSum()" style="background:transparent; border:none; color:white; text-align:center; padding:0; width:100%; font-size:16px; font-weight:bold; outline:none;"></div>
-                <div class="mini-badge" style="border-color: var(--success);"><label style="color:var(--success)">FARK</label><div id="netResult" style="color:var(--success); font-size:16px; font-weight:bold;">0,00</div></div>
-            </div>
-            <button class="btn btn-finish" onclick="finishDay()">GÜNÜ BİTİR VE ARŞİVLE</button>
-        </div>
-    </div>
+    # --- YAN MENÜ (SIDEBAR) ---
+    with st.sidebar:
+        st.header("⚙️ Kontrol Paneli")
+        sayfa = st.radio("Sayfa Değiştir", ["🏠 Üretim Ekranı", "🏷️ Artikel Kütüphanesi", "📜 Günlük Arşiv"])
+        st.divider()
+        st.write(f"📅 Tarih: {datetime.now().strftime('%d.%m.%Y')}")
 
-    <div id="tab-kayit" class="tab-content">
-        <div class="card">
-            <div class="grid-inputs">
-                <div><label>ARTİKEL</label><input type="text" id="dbArt"></div>
-                <div><label>TE</label><input type="number" id="dbTE" step="0.001"></div>
-                <div style="grid-column: span 2;"><label>Not</label><input type="text" id="dbNote"></div>
-            </div>
-            <button class="btn btn-add" style="background:var(--success);" onclick="saveDb()">REHBERE KAYDET</button>
-            <div class="table-wrapper"><table style="margin-top:10px;"><thead><tr><th>ARTİKEL</th><th>TE</th><th>SİL</th></tr></thead><tbody id="dbListBody"></tbody></table></div>
-        </div>
-    </div>
-    
-    <div id="tab-arsiv" class="tab-content">
-        <div class="card" id="archiveListContainer"></div>
-    </div>
-
-    <div id="tab-ayarlar" class="tab-content"><div class="card"><button class="btn" style="background:var(--danger);" onclick="resetEverything()">⚠️ TÜM VERİLERİ SİL</button></div></div>
-</div>
-
-<script>
-    const STORAGE_KEY = 'v139_history'; 
-    const DB_KEY = 'v139_db';
-    let scanner = null;
-
-    function formatStrict(num) { return (num === 0 || isNaN(num)) ? "0,00" : parseFloat(num).toFixed(2).replace('.', ','); }
-    function parseBox(id) { let val = document.getElementById(id).value.toString().replace(',', '.'); return val === "" ? null : parseFloat(val); }
-
-    function engine() {
-        const a = parseBox('cAdet'), t = parseBox('cTE');
-        // Verim boşsa matematiksel işlem için 1 kabul et
-        const v = parseBox('cPro') || 1; 
-        if (a !== null && t !== null) {
-            document.getElementById('cRes').value = ((a * t) / v).toFixed(2).replace('.', ',');
-        }
-    }
-
-    function addRow() {
-        const proInput = document.getElementById('cPro').value;
-        const rowData = {
-            art: document.getElementById('cArt').value.toUpperCase() || '-',
-            note: document.getElementById('cNote').value || '-',
-            adet: document.getElementById('cAdet').value || 0,
-            te: document.getElementById('cTE').value || 0,
-            pro: proInput || "", // Boşsa boş kalsın
-            res: parseBox('cRes') || 0,
-            rust: parseBox('cRust') || 0,
-            gmk: parseBox('cGMK') || 0
-        };
-        const tr = document.createElement('tr');
-        tr.dataset.info = JSON.stringify(rowData);
+    # --- 🏠 ÜRETİM EKRANI ---
+    if sayfa == "🏠 Üretim Ekranı":
+        st.title("🚀 Üretim Takip")
         
-        tr.innerHTML = `
-            <td>${rowData.art}</td>
-            <td style="font-size:10px;">${rowData.note}</td>
-            <td>${rowData.adet}</td>
-            <td>${rowData.te}</td>
-            <td>${rowData.pro === "" ? "-" : rowData.pro}</td> 
-            <td style="color:var(--accent); font-weight:bold;">${formatStrict(rowData.res)}</td>
-            <td>${rowData.rust || '-'}</td>
-            <td>${rowData.gmk || '-'}</td>
-            <td><button onclick="this.closest('tr').remove(); calcSum();" style="border:none; background:none; color:var(--danger);">❌</button></td>`;
+        with st.container():
+            col1, col2 = st.columns(2)
+            with col1:
+                art_no = st.selectbox("Artikel Seç veya Yaz", list(st.session_state["kutuphane"].keys()))
+                te_degeri = st.session_state["kutuphane"].get(art_no, 0.0)
+                adet = st.number_input("Üretilen Adet", min_value=0, step=1)
+                verim = st.number_input("Verim (Kutu boşsa 1 kabul edilir)", value=1.0, step=0.1)
             
-        document.getElementById('dailyBody').appendChild(tr);
-        // Temizlik: Verimi de boşalt
-        ['cArt','cAdet','cTE','cRes','cRust','cGMK','cNote','cPro'].forEach(i => document.getElementById(i).value = "");
-        calcSum();
-    }
+            with col2:
+                rust = st.number_input("Rüst (Dakika)", min_value=0, step=1)
+                gmk = st.number_input("GMK / T53 (Dakika)", min_value=0, step=1)
+                notlar = st.text_input("Not / Auftrag No")
+                
+                # Hesaplama (Verim mantığı korundu)
+                hesaplanan_dk = (adet * te_degeri) / verim if verim != 0 else 0
+                st.metric("Hesaplanan Dakika", f"{hesaplanan_dk:.2f} dk")
 
-    function calcSum() {
-        let sR = 0, sRu = 0, sG = 0;
-        document.querySelectorAll("#dailyBody tr").forEach(r => {
-            let i = JSON.parse(r.dataset.info || '{}');
-            sR += parseFloat(i.res) || 0; 
-            sRu += parseFloat(i.rust) || 0; 
-            sG += parseFloat(i.gmk) || 0;
-        });
-        document.getElementById('sumRes').innerText = formatStrict(sR);
-        document.getElementById('sumRust').innerText = sRu;
-        document.getElementById('sumGMK').innerText = sG;
-        let target = parseFloat(document.getElementById('customTarget').value) || 0;
-        let diff = target - (sR + sRu + sG);
-        const netResEl = document.getElementById('netResult');
-        netResEl.innerText = formatStrict(diff);
-        netResEl.style.color = diff <= 0 ? "var(--success)" : "var(--danger)";
-    }
+        if st.button("➕ LİSTEYE EKLE"):
+            yeni_is = {
+                "Auftrag": notlar,
+                "Artikel": art_no,
+                "Adet": adet,
+                "TE": te_degeri,
+                "Verim": verim,
+                "Net DK": round(hesaplanan_dk, 2),
+                "Rüst": rust,
+                "GMK": gmk,
+                "Toplam": round(hesaplanan_dk + rust + gmk, 2)
+            }
+            st.session_state["liste"].append(yeni_is)
+            st.success("İş başarıyla eklendi!")
 
-    // Diğer fonksiyonlar (Kamera, Arşiv vb.) v140.7/8 ile aynıdır...
-    function toggleDetails(id) {
-        const el = document.getElementById(id);
-        el.style.display = (el.style.display === 'block') ? 'none' : 'block';
-    }
+        # --- TABLO ---
+        if st.session_state["liste"]:
+            st.subheader("📊 Günlük Liste")
+            df = pd.DataFrame(st.session_state["liste"])
+            st.table(df)
+            
+            # Toplam Özeti
+            toplam_dk = df["Toplam"].sum()
+            hedef = st.number_input("Günlük Hedef (Dakika)", value=465)
+            fark = hedef - toplam_dk
+            
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Toplam Üretim", f"{toplam_dk:.2f} dk")
+            c2.metric("Kalan Hedef", f"{fark:.2f} dk", delta=-fark, delta_color="inverse")
+            
+            if st.button("🗑️ Listeyi Temizle"):
+                st.session_state["liste"] = []
+                st.rerun()
 
-    function renderArchive() {
-        let arc = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        const container = document.getElementById('archiveListContainer');
-        if (arc.length === 0) { container.innerHTML = "Kayıt yok."; return; }
-        container.innerHTML = arc.map((day, idx) => {
-            let totalDk = day.items.reduce((sum, i) => sum + (i.res || 0) + (i.rust || 0) + (i.gmk || 0), 0);
-            return `<div class="archive-item"><div class="archive-header"><div style="flex-grow:1" onclick="toggleDetails('det-${idx}')"><b>📅 ${day.date}</b> | Toplam: ${formatStrict(totalDk)}</div><button class="btn-del-day" onclick="deleteArchiveDay(${idx})">SİL</button></div><div id="det-${idx}" class="details-table table-wrapper"><table><thead><tr><th>AUFTRAG</th><th>ADET</th><th>DK</th><th>R</th><th>G</th></tr></thead><tbody>${day.items.map(i => `<tr><td>${i.art}</td><td>${i.adet}</td><td>${formatStrict(i.res)}</td><td>${i.rust}</td><td>${i.gmk}</td></tr>`).join('')}</tbody></table></div></div>`;
-        }).join('');
-    }
+    # --- 🏷️ ARTIKEL KÜTÜPHANESİ ---
+    elif sayfa == "🏷️ Artikel Kütüphanesi":
+        st.title("📖 Artikel Kütüphanesi")
+        col1, col2 = st.columns(2)
+        with col1:
+            yeni_art = st.text_input("Yeni Artikel Adı").upper()
+            yeni_te = st.number_input("TE Değeri (Dakika)", format="%.3f")
+            if st.button("💾 Kütüphaneye Kaydet"):
+                if yeni_art:
+                    st.session_state["kutuphane"][yeni_art] = yeni_te
+                    st.success(f"{yeni_art} başarıyla kaydedildi.")
+                else:
+                    st.error("Lütfen bir isim girin!")
 
-    function deleteArchiveDay(idx) {
-        if(confirm("Silinsin mi?")) {
-            let arc = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-            arc.splice(idx, 1);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(arc));
-            renderArchive();
-        }
-    }
+        with col2:
+            st.subheader("Kayıtlı Artikeller")
+            lib_df = pd.DataFrame(list(st.session_state["kutuphane"].items()), columns=["Artikel", "TE"])
+            st.dataframe(lib_df, use_container_width=True)
 
-    async function toggleScanner() {
-        const readerDiv = document.getElementById('reader');
-        if (scanner) { await scanner.stop(); scanner = null; readerDiv.style.display = 'none'; return; }
-        readerDiv.style.display = 'block';
-        scanner = new Html5Qrcode("reader");
-        try {
-            await scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (text) => {
-                document.getElementById('cArt').value = text; fetchTE(text); toggleScanner();
-            });
-        } catch (e) { alert("Hata"); toggleScanner(); }
-    }
-
-    function fetchTE(v) {
-        let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-        let m = db.find(x => x.art === v.toUpperCase().trim());
-        if (m) { document.getElementById('cTE').value = m.te; document.getElementById('cNote').value = m.note || ""; engine(); }
-    }
-
-    function finishDay() {
-        let rows = Array.from(document.querySelectorAll("#dailyBody tr"));
-        if(!rows.length) return;
-        let arc = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        arc.unshift({ date: document.getElementById('targetDate').value, items: rows.map(r => JSON.parse(r.dataset.info)) });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(arc));
-        document.getElementById('dailyBody').innerHTML = ""; calcSum(); renderArchive();
-    }
-
-    function saveDb() {
-        let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-        db.push({art: document.getElementById('dbArt').value.toUpperCase(), te: document.getElementById('dbTE').value, note: document.getElementById('dbNote').value});
-        localStorage.setItem(DB_KEY, JSON.stringify(db)); renderDbList();
-    }
-
-    function renderDbList() {
-        let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-        document.getElementById('dbListBody').innerHTML = db.map((i, idx) => `<tr><td>${i.art}</td><td>${i.te}</td><td><button onclick="delDb(${idx})" style="color:red; background:none; border:none;">🗑️</button></td></tr>`).join('');
-    }
-
-    function delDb(idx) { let db = JSON.parse(localStorage.getItem(DB_KEY)) || []; db.splice(idx,1); localStorage.setItem(DB_KEY, JSON.stringify(db)); renderDbList(); }
-
-    function switchTab(id, btn) {
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(id).classList.add('active'); btn.classList.add('active');
-    }
-
-    function resetEverything() { if(confirm("Her şey silinecek!")) { localStorage.clear(); location.reload(); } }
-    window.onload = () => { document.getElementById('targetDate').value = new Date().toISOString().split('T')[0]; renderArchive(); calcSum(); };
-</script>
-</body>
-</html>
+    # --- 📜 GÜNLÜK ARŞİV ---
+    elif sayfa == "📜 Günlük Arşiv":
+        st.title("📜 Geçmiş Kayıtlar")
+        st.info("Bu sürümde veriler geçici bellektedir. Kalıcı Excel kaydı için Google Sheets entegrasyonu yapılabilir.")
