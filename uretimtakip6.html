@@ -21,9 +21,9 @@ def giris_ekrani():
 
     if not st.session_state["auth"]:
         st.title("🔐 Üretim Portalı")
-        sifre = st.text_input("Giriş Şifresini Giriniz", type="1234")
+        sifre = st.text_input("Giriş Şifresini Giriniz", type="1641")
         if st.button("Sisteme Giriş Yap"):
-            if sifre == "percin123": # <--- İstediğin şifreyi buraya yaz
+            if sifre == "1641": # <--- İstediğin şifreyi buraya yaz
                 st.session_state["auth"] = True
                 st.rerun()
             else:
