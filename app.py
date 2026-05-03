@@ -123,7 +123,7 @@ with sekme2:
     with st.container():
         # Giriş alanları boş (temiz) geliyor
         y_ad = st.text_input("Artikel İsmi", value="").upper()
-        # TE değeri 0.000 olarak boş (sıfırlanmış) geliyor
+        # TE değeri olarak boş (sıfırlanmış) geliyor
         y_te = st.number_input("TE Değeri (Dakika)", format="%.3f", value=0.000)
         
         if st.button("REHBERE KAYDET"):
