@@ -3,142 +3,157 @@ import pandas as pd
 from datetime import datetime
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Üretim Takip Pro v142", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Üretim Takip Pro v143", layout="wide")
 
-# --- ŞİFRE AYARI ---
-GIZLI_SIFRE = "1641"
-
-# --- CSS: KOYU TEMA VE BUTONLAR ---
+# --- HTML/CSS İLE GÖRÜNÜMÜ İYİLEŞTİRME ---
+# Bu kısım Python kodunu eski HTML stiline benzetir
 st.markdown("""
     <style>
-    .stApp { background-color: #0d1117; color: #c9d1d9; }
-    div.stButton > button:first-child { 
-        background-color: #238636; 
-        color: white; 
-        border-radius: 8px; 
-        border: none;
-        padding: 10px;
-        font-weight: bold;
+    /* Ana Arkaplan */
+    .stApp {
+        background-color: #0d1117;
+        color: #c9d1d9;
     }
-    .main-header { color: #58a6ff; text-align: center; font-size: 24px; font-weight: bold; }
+    
+    /* Kart Yapısı (HTML'deki .card gibi) */
+    div[data-testid="stVerticalBlock"] > div {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
+    /* Giriş Kutuları */
+    input {
+        background-color: #0d1117 !important;
+        color: white !important;
+        border: 1px solid #30363d !important;
+    }
+
+    /* HTML Stili Yeşil Buton */
+    div.stButton > button:first-child {
+        background-color: #238636;
+        color: white;
+        border: 1px solid rgba(240,246,252,0.1);
+        border-radius: 6px;
+        padding: 10px 20px;
+        font-weight: 600;
+        width: 100%;
+        transition: 0.2s;
+    }
+    
+    div.stButton > button:first-child:hover {
+        background-color: #2ea043;
+        border-color: #8b949e;
+    }
+
+    /* Tablo Görünümü */
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    
+    /* Başlıklar */
+    h1, h2, h3 {
+        color: #58a6ff !important;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- GİRİŞ KONTROLÜ ---
+# --- ŞİFRE KONTROLÜ ---
 if "auth" not in st.session_state:
     st.session_state["auth"] = False
 
 if not st.session_state["auth"]:
-    st.markdown('<p class="main-header">🔐 Üretim Takip Sistemi</p>', unsafe_allow_html=True)
-    with st.container():
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            sifre_input = st.text_input("Giriş Şifresi", type="password", placeholder="Şifreyi yazın...")
-            if st.button("Sisteme Giriş Yap"):
-                if sifre_input == GIZLI_SIFRE:
-                    st.session_state["auth"] = True
-                    st.rerun()
-                else:
-                    st.error("❌ Hatalı Şifre! Lütfen tekrar deneyin.")
+    st.markdown("<h2 style='text-align: center;'>🔐 Üretim Portalı Girişi</h2>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,1,1])
+    with col2:
+        sifre = st.text_input("Giriş Şifresi", type="password")
+        if st.button("Giriş Yap"):
+            if sifre == "1641":
+                st.session_state["auth"] = True
+                st.rerun()
+            else:
+                st.error("Hatalı Şifre!")
     st.stop()
 
-# --- VERİ DEPOLAMA (SESSION STATE) ---
+# --- VERİ VE KÜTÜPHANE ---
 if "liste" not in st.session_state:
     st.session_state["liste"] = []
 if "kutuphane" not in st.session_state:
-    # Başlangıç Kütüphanesi
-    st.session_state["kutuphane"] = {"PERÇİN": 0.550, "CIVATA": 0.320}
+    st.session_state["kutuphane"] = {"PERÇİN": 0.550}
 
 # --- YAN MENÜ ---
-with st.sidebar:
-    st.title("📱 Menü")
-    sayfa = st.radio("Gitmek istediğiniz sayfa:", ["🏠 Üretim Girişi", "🏷️ Artikel Rehberi", "📜 Günlük Özet"])
-    st.divider()
-    if st.button("🚪 Çıkış Yap"):
-        st.session_state["auth"] = False
-        st.rerun()
+st.sidebar.markdown("### ⚙️ Menü")
+sayfa = st.sidebar.radio("", ["🏠 Üretim Ekranı", "🏷️ Artikel Kütüphanesi", "📜 Günlük Arşiv"])
 
-# --- 🏠 ÜRETİM GİRİŞİ ---
-if sayfa == "🏠 Üretim Girişi":
-    st.markdown('<p class="main-header">🏠 Günlük Üretim Girişi</p>', unsafe_allow_html=True)
+# --- 🏠 ÜRETİM EKRANI ---
+if sayfa == "🏠 Üretim Ekranı":
+    st.markdown("### 🚀 Günlük Üretim Girişi")
     
-    with st.form("uretim_formu", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            artikel = st.selectbox("Artikel Seçin", list(st.session_state["kutuphane"].keys()))
-            adet = st.number_input("Üretilen Adet", min_value=0, step=1)
-            verim = st.number_input("Verim (Boşsa 1 kabul edilir)", min_value=0.1, value=1.0, step=0.1)
-        
-        with col2:
-            rust = st.number_input("Rüst (Dakika)", min_value=0, step=1)
-            gmk = st.number_input("GMK (Dakika)", min_value=0, step=1)
-            notlar = st.text_input("Auftrag / Not")
-        
-        ekle = st.form_submit_button("➕ LİSTEYE EKLE")
-
-    if ekle:
-        te = st.session_state["kutuphane"][artikel]
-        hesaplanan_dk = (adet * te) / verim
-        toplam = hesaplanan_dk + rust + gmk
-        
-        yeni_kayit = {
-            "Zaman": datetime.now().strftime("%H:%M"),
-            "Auftrag": notlar,
-            "Artikel": artikel,
-            "Adet": adet,
-            "TE": te,
-            "Net DK": round(hesaplanan_dk, 2),
-            "Rüst": rust,
-            "GMK": gmk,
-            "Toplam": round(toplam, 2)
-        }
-        st.session_state["liste"].append(yeni_is)
-        st.success(f"{artikel} başarıyla listeye eklendi!")
-
-    # Tablo Gösterimi
-    if st.session_state["liste"]:
-        df = pd.DataFrame(st.session_state["liste"])
-        st.table(df)
-        
-        # Hesaplamalar
-        toplam_sure = df["Toplam"].sum()
-        hedef = 465 # Standart hedef
-        fark = hedef - toplam_sure
-        
+    with st.container():
         c1, c2 = st.columns(2)
-        c1.metric("Toplam Üretilen (DK)", f"{toplam_sure:.2f}")
-        c2.metric("Kalan Hedef (Fark)", f"{fark:.2f}", delta=-fark, delta_color="inverse")
+        with c1:
+            art_sec = st.selectbox("Artikel Seç", list(st.session_state["kutuphane"].keys()))
+            adet = st.number_input("Adet", min_value=0, step=1)
+            verim = st.number_input("Verim", value=1.0, step=0.1)
+        with c2:
+            rust = st.number_input("Rüst", min_value=0, step=1)
+            gmk = st.number_input("GMK", min_value=0, step=1)
+            notlar = st.text_input("Auftrag / Not")
 
-# --- 🏷️ ARTIKEL REHBERİ ---
-elif sayfa == "🏷️ Artikel Rehberi":
-    st.markdown('<p class="main-header">🏷️ Artikel & Kütüphane Yönetimi</p>', unsafe_allow_html=True)
-    
-    with st.expander("➕ Yeni Artikel Ekle"):
-        yeni_ad = st.text_input("Artikel İsmi").upper()
-        yeni_te = st.number_input("TE Değeri (Dakika)", format="%.3f")
-        if st.button("Rehbere Kaydet"):
-            if yeni_ad:
-                st.session_state["kutuphane"][yeni_ad] = yeni_te
-                st.success(f"{yeni_ad} rehbere eklendi!")
-                st.rerun()
-    
-    st.subheader("Kayıtlı Artikeller")
-    rehber_df = pd.DataFrame(list(st.session_state["kutuphane"].items()), columns=["Artikel", "TE"])
-    st.dataframe(rehber_df, use_container_width=True)
+        # Anlık Hesaplama Gösterimi
+        te_deg = st.session_state["kutuphane"][art_sec]
+        hesap_dk = (adet * te_deg) / verim
+        toplam_dk = hesap_dk + rust + gmk
+        st.markdown(f"<p style='color:#58a6ff; font-weight:bold;'>Hesaplanan: {toplam_dk:.2f} Dakika</p>", unsafe_allow_html=True)
 
-# --- 📜 GÜNLÜK ÖZET ---
-elif sayfa == "📜 Günlük Özet":
-    st.markdown('<p class="main-header">📜 Günlük Özet ve Arşiv</p>', unsafe_allow_html=True)
-    if st.session_state["liste"]:
-        df_final = pd.DataFrame(st.session_state["liste"])
-        st.dataframe(df_final, use_container_width=True)
-        
-        csv = df_final.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Günlük Veriyi Excel (CSV) İndir", data=csv, file_name=f"uretim_{datetime.now().strftime('%Y-%m-%d')}.csv")
-        
-        if st.button("🔴 GÜNÜ BİTİR (Tümünü Sil)"):
-            st.session_state["liste"] = []
-            st.warning("Tüm günlük veriler temizlendi.")
+        if st.button("LİSTEYE EKLE"):
+            yeni = {
+                "Zaman": datetime.now().strftime("%H:%M"),
+                "Auftrag": notlar,
+                "Artikel": art_sec,
+                "Adet": adet,
+                "Net DK": round(hesap_dk, 2),
+                "Rüst": rust,
+                "GMK": gmk,
+                "Toplam": round(toplam_dk, 2)
+            }
+            st.session_state["liste"].append(yeni)
             st.rerun()
-    else:
-        st.info("Henüz kayıtlı veri bulunmuyor.")
+
+    # Üretim Tablosu
+    if st.session_state["liste"]:
+        st.markdown("### 📊 Bugünün Üretimi")
+        df = pd.DataFrame(st.session_state["liste"])
+        st.dataframe(df, use_container_width=True)
+        
+        # Özet Kartları
+        t_dk = df["Toplam"].sum()
+        fark = 465 - t_dk
+        k1, k2 = st.columns(2)
+        k1.metric("Toplam Süre", f"{t_dk:.2f} dk")
+        k2.metric("Kalan Hedef", f"{fark:.2f} dk", delta=-fark, delta_color="inverse")
+
+# --- Diğer sayfalar (Kütüphane ve Arşiv) aynı mantıkla devam eder ---
+elif sayfa == "🏷️ Artikel Kütüphanesi":
+    st.markdown("### 🏷️ Artikel Yönetimi")
+    y_ad = st.text_input("Yeni Artikel Adı").upper()
+    y_te = st.number_input("TE Değeri", format="%.3f")
+    if st.button("KAYDET"):
+        st.session_state["kutuphane"][y_ad] = y_te
+        st.success("Kaydedildi!")
+    
+    st.write("---")
+    st.table(pd.DataFrame(list(st.session_state["kutuphane"].items()), columns=["Artikel", "TE"]))
+
+elif sayfa == "📜 Günlük Arşiv":
+    st.markdown("### 📜 Arşiv")
+    if st.session_state["liste"]:
+        st.download_button("Excel Olarak İndir (CSV)", pd.DataFrame(st.session_state["liste"]).to_csv().encode('utf-8'), "uretim.csv")
+        if st.button("Günü Sıfırla"):
+            st.session_state["liste"] = []
+            st.rerun()
