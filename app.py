@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Üretim Takip Pro v146", layout="wide")
+st.set_page_config(page_title="Üretim Takip Pro v147", layout="wide")
 
 # --- BEYAZ TEMA VE ÜST MENÜ STİLİ ---
 st.markdown("""
@@ -54,11 +54,12 @@ if not st.session_state["auth"]:
                 st.error("Hatalı Şifre!")
     st.stop()
 
-# --- VERİ VE KÜTÜPHANE ---
+# --- TAMAMEN BOŞ VERİ YAPISI ---
 if "liste" not in st.session_state:
     st.session_state["liste"] = []
 if "kutuphane" not in st.session_state:
-    st.session_state["kutuphane"] = {"PERÇİN": 0.550}
+    # Tüm kayıtlı artikelleri (Perçin dahil) sildik, liste boş başlıyor.
+    st.session_state["kutuphane"] = {}
 
 # --- ÜST SEKMELİ MENÜ ---
 sekme1, sekme2, sekme3 = st.tabs(["🏠 Üretim Girişi", "🏷️ Artikel Kütüphanesi", "📜 Günlük Arşiv"])
@@ -70,8 +71,9 @@ with sekme1:
     with st.container():
         c1, c2 = st.columns(2)
         with c1:
-            # Kutucukların boş veya sıfır gelmesi için 'value' ayarları yapıldı
-            art_sec = st.selectbox("Artikel Seç", [""] + list(st.session_state["kutuphane"].keys()), index=0)
+            # Artikel seçimi boş başlıyor
+            kutuphane_listesi = list(st.session_state["kutuphane"].keys())
+            art_sec = st.selectbox("Artikel Seç", [""] + kutuphane_listesi, index=0)
             adet = st.number_input("Adet", min_value=0, value=0, step=1)
             verim = st.number_input("Verim", min_value=0.1, value=1.0, step=0.1)
         with c2:
@@ -89,7 +91,7 @@ with sekme1:
 
         if st.button("LİSTEYE EKLE"):
             if art_sec == "":
-                st.warning("Lütfen bir Artikel seçin!")
+                st.warning("Lütfen önce Kütüphane sekmesinden bir Artikel tanımlayın ve seçin!")
             else:
                 yeni = {
                     "Saat": datetime.now().strftime("%H:%M"),
@@ -101,17 +103,14 @@ with sekme1:
                     "GMK": gmk,
                     "Toplam": round(toplam_dk, 2)
                 }
-                # Listeye en başa ekleyerek aşağı doğru sıralanmasını sağlıyoruz
                 st.session_state["liste"].insert(0, yeni)
                 st.rerun()
 
-    # Üretim Listesi (Aşağı doğru listeleme)
     if st.session_state["liste"]:
         st.markdown("### 📊 Bugünün Kayıtları")
         df = pd.DataFrame(st.session_state["liste"])
         st.table(df)
         
-        # Hedef Hesaplama
         t_dk = df["Toplam"].sum()
         fark = 465 - t_dk
         k1, k2 = st.columns(2)
@@ -122,27 +121,34 @@ with sekme1:
 with sekme2:
     st.markdown("### 🏷️ Yeni Artikel Tanımla")
     with st.container():
-        y_ad = st.text_input("Artikel İsmi (Örn: PERÇİN 5X10)").upper()
+        # Giriş alanları boş (temiz) geliyor
+        y_ad = st.text_input("Artikel İsmi", value="").upper()
+        # TE değeri 0.000 olarak boş (sıfırlanmış) geliyor
         y_te = st.number_input("TE Değeri (Dakika)", format="%.3f", value=0.000)
+        
         if st.button("REHBERE KAYDET"):
-            if y_ad:
+            if y_ad and y_te > 0:
                 st.session_state["kutuphane"][y_ad] = y_te
                 st.success(f"{y_ad} kütüphaneye eklendi!")
                 st.rerun()
+            else:
+                st.error("Lütfen Artikel ismi ve geçerli bir TE değeri girin!")
     
     st.write("---")
     st.markdown("### 📖 Kayıtlı Artikeller")
-    st.table(pd.DataFrame(list(st.session_state["kutuphane"].items()), columns=["Artikel", "TE"]))
+    if st.session_state["kutuphane"]:
+        st.table(pd.DataFrame(list(st.session_state["kutuphane"].items()), columns=["Artikel", "TE"]))
+    else:
+        st.info("Kütüphane şu an boş. Lütfen yukarıdan yeni bir Artikel ekleyin.")
 
 # --- 📜 GÜNLÜK ARŞİV SEKMESİ ---
 with sekme3:
     st.markdown("### 📜 Gün Sonu ve Arşiv")
     if st.session_state["liste"]:
         csv = pd.DataFrame(st.session_state["liste"]).to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Bugünün Verilerini İndir (Excel/CSV)", data=csv, file_name=f"uretim_{datetime.now().strftime('%d_%m')}.csv")
+        st.download_button("📥 Verileri İndir (Excel/CSV)", data=csv, file_name=f"uretim_{datetime.now().strftime('%d_%m')}.csv")
         
-        st.write("---")
-        if st.button("🔴 TÜM LİSTEYİ SİL VE GÜNÜ KAPAT"):
+        if st.button("🔴 TÜM LİSTEYİ TEMİZLE"):
             st.session_state["liste"] = []
             st.rerun()
     else:
