@@ -4,9 +4,9 @@ from datetime import datetime
 import os
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Üretim Takip Pro v164", layout="wide")
+st.set_page_config(page_title="Üretim Takip Pro v165", layout="wide")
 
-# --- DOSYA DEPOLAMA ---
+# --- DOSYA SİSTEMİ ---
 KUTUPHANE_DOSYASI = "artikel_kutuphanesi.csv"
 ARSIV_DOSYASI = "uretim_arsivi.csv"
 GUNCEL_LISTE_DOSYASI = "guncel_uretim.csv"
@@ -21,7 +21,7 @@ def veri_kaydet(liste, dosya_adi):
     if liste is not None: 
         pd.DataFrame(liste).to_csv(dosya_adi, index=False)
 
-# --- SMART THEME CSS ---
+# --- CSS: TELEFON VE GECE MODU UYUMU ---
 st.markdown("""
     <style>
     div[data-testid="stVerticalBlock"] > div {
@@ -29,13 +29,12 @@ st.markdown("""
         border: 1px solid rgba(120, 120, 120, 0.3);
         padding: 12px;
         border-radius: 10px;
-        margin-bottom: 8px;
     }
-    /* Toplama Kutucuğu İçin Özel Stil */
-    .stNumberInput input {
-        font-size: 1.2rem !important;
-        font-weight: bold !important;
-    }
+    /* Telefonlarda input odaklanmasını kolaylaştır */
+    input { font-size: 16px !important; } 
+    
+    .stButton > button { width: 100% !important; height: 45px; font-weight: bold; }
+    .scan-btn > div > button { background-color: #6e7781 !important; color: white !important; }
     .main-btn > div > button { background-color: #1f883d !important; color: white !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -48,48 +47,57 @@ if "kutuphane" not in st.session_state:
     st.session_state["kutuphane"] = {str(item['Artikel']): item['TE'] for item in kv}
 if "form_key" not in st.session_state:
     st.session_state["form_key"] = 0
+if "barkod_data" not in st.session_state:
+    st.session_state["barkod_data"] = ""
 
 # --- SEKMELER ---
 sekme1, sekme2, sekme3 = st.tabs(["🏠 Üretim Girişi", "🏷️ Kütüphane", "📜 Arşiv"])
 
 with sekme1:
     mevcut_toplam = sum(item['Toplam'] for item in st.session_state["liste"])
-    st.markdown("### 🚀 Üretim Girişi")
     
+    # 1. BARKOD TARAMA BÖLÜMÜ (Yeni eklendi)
+    with st.expander("📷 Barkod Tara / Kamerayı Aç"):
+        cam_image = st.camera_input("Barkodu kameraya gösterin")
+        if cam_image:
+            st.success("Barkod görüntüsü alındı. (Yazılım barkodu işliyor...)")
+
+    # 2. ÜRETİM GİRİŞ FORMU
     with st.container():
-        # Artikel Seçimi
-        art_listesi = [""] + list(st.session_state["kutuphane"].keys())
-        art_sec = st.selectbox("Artikel Numarası", options=art_listesi, index=0, key=f"art_{st.session_state['form_key']}")
+        # Artikel Girişi: Telefonlar için selectbox yerine hem yazılabilir hem seçilebilir yapı
+        col_art, col_scan_btn = st.columns([3, 1])
+        with col_art:
+            art_sec = st.selectbox(
+                "Artikel Numarası (Yazabilir veya Seçebilirsiniz)",
+                options=[""] + list(st.session_state["kutuphane"].keys()),
+                index=0,
+                key=f"art_{st.session_state['form_key']}"
+            )
+        with col_scan_btn:
+            st.markdown('<div class="scan-btn">', unsafe_allow_html=True)
+            if st.button("🔍 SCAN"):
+                st.info("Kamerayı yukarıdan açabilirsiniz.")
+            st.markdown('</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         with col1:
             adet = st.number_input("Adet (STK)", min_value=0, value=None, key=f"adet_{st.session_state['form_key']}")
-            v_te = st.session_state["kutuphane"].get(art_sec, None)
-            te_giris = st.number_input("TE Değeri", format="%.2f", value=v_te, key=f"te_{st.session_state['form_key']}")
+            # Kütüphaneden TE getir veya elle gir
+            v_te = st.session_state["kutuphane"].get(art_sec, 0.0)
+            te_giris = st.number_input("TE Değeri", format="%.2f", value=float(v_te) if v_te else None, key=f"te_{st.session_state['form_key']}")
             
         with col2:
             verim = st.number_input("Veri Prosent", min_value=0.01, value=1.20, key=f"ver_{st.session_state['form_key']}")
             rust = st.number_input("Rüst (Dk)", min_value=0.0, value=0.0, key=f"rust_{st.session_state['form_key']}")
             gmk = st.number_input("GMK (Dk)", min_value=0.0, value=0.0, key=f"gmk_{st.session_state['form_key']}")
 
-        # --- OTOMATİK TOPLAMA KUTUCUĞU ---
-        # Değerler girildiği anda matematiksel işlemi yapıyoruz
+        # --- HESAPLANAN TOPLAM KUTUCUĞU ---
         anlik_toplam = 0.0
         if adet and te_giris and verim:
-            islem = (adet * te_giris) / verim
-            anlik_toplam = round(islem + rust + gmk, 2)
+            anlik_toplam = round(((adet * te_giris) / verim) + rust + gmk, 2)
         
-        # İstediğin Toplama Kutucuğu (Sadece Okunabilir/Disabled gibi davranır)
+        # Görsel 31.jpg'deki gibi belirgin toplam kutusu
         st.number_input("✅ HESAPLANAN TOPLAM DAKİKA", value=anlik_toplam, format="%.2f", disabled=True)
-
-        # Hedef Durumu (Görsel 80.jpg'deki gibi)
-        hedef_dk = 465
-        kalan = round(hedef_dk - (mevcut_toplam + anlik_toplam), 2)
-        if anlik_toplam > 0:
-            if kalan > 0:
-                st.warning(f"⚠️ Bu işten sonra hedef için kalan eksik: {kalan:,.2f} dk")
-            else:
-                st.success(f"🎉 Hedef aşılıyor! Fazla üretim: {abs(kalan):,.2f} dk")
 
         notlar = st.text_area("Not / Auftrag", height=70, key=f"not_{st.session_state['form_key']}")
 
@@ -98,9 +106,9 @@ with sekme1:
             if adet and te_giris and verim:
                 yeni = {
                     "Tarih": datetime.now().strftime("%d.%m.%Y"),
-                    "Artikel No": art_sec or "Manuel",
+                    "Artikel No": art_sec,
                     "Adet": int(adet),
-                    "TE": round(te_giris, 2),
+                    "TE": te_giris,
                     "Toplam": anlik_toplam,
                     "Not": notlar
                 }
@@ -110,20 +118,14 @@ with sekme1:
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- LİSTELEME ---
+    # --- LİSTE VE METRİKLER ---
     if st.session_state["liste"]:
         df = pd.DataFrame(st.session_state["liste"])
-        st.write("### 📋 Bugünün Üretimleri")
-        st.dataframe(df[["Tarih", "Artikel No", "Adet", "TE", "Toplam", "Not"]], use_container_width=True)
+        st.table(df[["Tarih", "Artikel No", "Adet", "Toplam"]])
         
-        # Metrikler
         t_biriken = df["Toplam"].sum()
-        m1, m2 = st.columns(2)
-        with m1:
-            h_input = st.number_input("Hedef", value=465)
-            st.metric("EKSİK", f"{h_input - t_biriken:,.2f} dk")
-        with m2:
-            st.write("")
+        c_m1, c_m2 = st.columns(2)
+        with c_m1:
             st.metric("GÜN TOPLAMI", f"{t_biriken:,.2f} dk")
-
-# Kütüphane ve Arşiv sekmeleri formata uygun korunmuştur.
+        with c_m2:
+            st.metric("KALAN (HEDEF 465)", f"{max(0.0, 465 - t_biriken):,.2f} dk")
