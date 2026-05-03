@@ -3,15 +3,13 @@ import pandas as pd
 from datetime import datetime
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Üretim Takip Pro v147", layout="wide")
+st.set_page_config(page_title="Üretim Takip Pro v149", layout="wide")
 
 # --- BEYAZ TEMA VE ÜST MENÜ STİLİ ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1f2328; }
     [data-testid="stSidebar"] { display: none; }
-    
-    /* Giriş Kutuları ve Kart Tasarımı */
     div[data-testid="stVerticalBlock"] > div {
         background-color: #f6f8fa;
         border: 1px solid #d0d7de;
@@ -19,11 +17,6 @@ st.markdown("""
         border-radius: 10px;
         margin-bottom: 10px;
     }
-
-    /* Tablo Tasarımı */
-    .stTable { background-color: white; border-radius: 10px; }
-
-    /* Yeşil Ekleme Butonu */
     div.stButton > button:first-child {
         background-color: #1f883d;
         color: white;
@@ -32,33 +25,34 @@ st.markdown("""
         border: none;
         height: 45px;
     }
-    
     h3 { color: #0969da !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ŞİFRE KONTROLÜ (1641) ---
+# --- ŞİFRE KONTROLÜ (SECRETS'TAN ÇEKİLİYOR) ---
 if "auth" not in st.session_state:
     st.session_state["auth"] = False
 
 if not st.session_state["auth"]:
     st.markdown("<h2 style='text-align: center;'>🔐 Üretim Portalı Girişi</h2>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1,1,1])
-    with c2:
-        sifre = st.text_input("Giriş Şifresi", type="password")
+    c1, col_login, c3 = st.columns([1,1,1])
+    with col_login:
+        # Şifreyi Secrets'tan alıyoruz
+        dogru_sifre = st.secrets["GIRIS_SIFRESI"]
+        
+        sifre_deneme = st.text_input("Giriş Şifresi", type="password", placeholder="Şifreyi yazınız...")
         if st.button("Giriş Yap"):
-            if sifre == "1641":
+            if sifre_deneme == dogru_sifre:
                 st.session_state["auth"] = True
                 st.rerun()
             else:
-                st.error("Hatalı Şifre!")
+                st.error("❌ Hatalı Şifre!")
     st.stop()
 
-# --- TAMAMEN BOŞ VERİ YAPISI ---
+# --- VERİ YAPISI ---
 if "liste" not in st.session_state:
     st.session_state["liste"] = []
 if "kutuphane" not in st.session_state:
-    # Tüm kayıtlı artikelleri (Perçin dahil) sildik, liste boş başlıyor.
     st.session_state["kutuphane"] = {}
 
 # --- ÜST SEKMELİ MENÜ ---
@@ -71,36 +65,40 @@ with sekme1:
     with st.container():
         c1, c2 = st.columns(2)
         with c1:
-            # Artikel seçimi boş başlıyor
             kutuphane_listesi = list(st.session_state["kutuphane"].keys())
             art_sec = st.selectbox("Artikel Seç", [""] + kutuphane_listesi, index=0)
-            adet = st.number_input("Adet", min_value=0, value=0, step=1)
-            verim = st.number_input("Verim", min_value=0.1, value=1.0, step=0.1)
+            adet = st.number_input("Adet", min_value=0, value=None, step=1, placeholder="Sayı giriniz...")
+            verim = st.number_input("Verim", min_value=0.1, value=None, step=0.1, placeholder="Örn: 1.0")
         with c2:
-            rust = st.number_input("Rüst (Dk)", min_value=0, value=0, step=1)
-            gmk = st.number_input("GMK (Dk)", min_value=0, value=0, step=1)
-            notlar = st.text_input("Auftrag / Not", value="")
+            rust = st.number_input("Rüst (Dk)", min_value=0, value=None, step=1, placeholder="Sayı giriniz...")
+            gmk = st.number_input("GMK (Dk)", min_value=0, value=None, step=1, placeholder="Sayı giriniz...")
+            notlar = st.text_input("Auftrag / Not", value="", placeholder="İsteğe bağlı not...")
 
-        # Hesaplama Mantığı
         toplam_dk = 0.0
-        if art_sec != "" and art_sec in st.session_state["kutuphane"]:
+        if art_sec != "" and adet is not None:
             te_deg = st.session_state["kutuphane"][art_sec]
-            hesap_dk = (adet * te_deg) / verim
-            toplam_dk = hesap_dk + rust + gmk
+            v_oran = verim if verim is not None else 1.0
+            hesap_dk = (adet * te_deg) / v_oran
+            r_ek = rust if rust is not None else 0
+            g_ek = gmk if gmk is not None else 0
+            toplam_dk = hesap_dk + r_ek + g_ek
             st.markdown(f"<p style='color:#0969da; font-weight:bold; font-size:20px;'>Hesaplanan: {toplam_dk:.2f} Dakika</p>", unsafe_allow_html=True)
 
         if st.button("LİSTEYE EKLE"):
-            if art_sec == "":
-                st.warning("Lütfen önce Kütüphane sekmesinden bir Artikel tanımlayın ve seçin!")
+            if art_sec == "" or adet is None:
+                st.warning("Lütfen Artikel seçin ve Adet girin!")
             else:
+                v_oran = verim if verim is not None else 1.0
+                r_ek = rust if rust is not None else 0
+                g_ek = gmk if gmk is not None else 0
                 yeni = {
                     "Saat": datetime.now().strftime("%H:%M"),
                     "Auftrag": notlar,
                     "Artikel": art_sec,
                     "Adet": adet,
-                    "Net DK": round((adet * st.session_state["kutuphane"][art_sec]) / verim, 2),
-                    "Rüst": rust,
-                    "GMK": gmk,
+                    "Net DK": round((adet * st.session_state["kutuphane"][art_sec]) / v_oran, 2),
+                    "Rüst": r_ek,
+                    "GMK": g_ek,
                     "Toplam": round(toplam_dk, 2)
                 }
                 st.session_state["liste"].insert(0, yeni)
@@ -108,48 +106,32 @@ with sekme1:
 
     if st.session_state["liste"]:
         st.markdown("### 📊 Bugünün Kayıtları")
-        df = pd.DataFrame(st.session_state["liste"])
-        st.table(df)
-        
-        t_dk = df["Toplam"].sum()
-        fark = 465 - t_dk
-        k1, k2 = st.columns(2)
-        k1.metric("Toplam Üretim", f"{t_dk:.2f} dk")
-        k2.metric("Kalan Hedef", f"{fark:.2f} dk", delta=-fark, delta_color="inverse")
+        st.table(pd.DataFrame(st.session_state["liste"]))
 
 # --- 🏷️ ARTIKEL KÜTÜPHANESİ SEKMESİ ---
 with sekme2:
     st.markdown("### 🏷️ Yeni Artikel Tanımla")
     with st.container():
-        # Giriş alanları boş (temiz) geliyor
-        y_ad = st.text_input("Artikel İsmi", value="").upper()
-        # TE değeri olarak boş (sıfırlanmış) geliyor
-        y_te = st.number_input("TE Değeri (Dakika)", format="%.3f", value=0.000)
-        
+        y_ad = st.text_input("Artikel İsmi", value="", placeholder="İsim giriniz...").upper()
+        y_te = st.number_input("TE Değeri (Dakika)", format="%.3f", value=None, placeholder="Örn: 0.550")
         if st.button("REHBERE KAYDET"):
-            if y_ad and y_te > 0:
+            if y_ad and y_te is not None:
                 st.session_state["kutuphane"][y_ad] = y_te
                 st.success(f"{y_ad} kütüphaneye eklendi!")
                 st.rerun()
             else:
-                st.error("Lütfen Artikel ismi ve geçerli bir TE değeri girin!")
+                st.error("Lütfen isim ve TE değeri girin!")
     
-    st.write("---")
-    st.markdown("### 📖 Kayıtlı Artikeller")
     if st.session_state["kutuphane"]:
+        st.write("---")
         st.table(pd.DataFrame(list(st.session_state["kutuphane"].items()), columns=["Artikel", "TE"]))
-    else:
-        st.info("Kütüphane şu an boş. Lütfen yukarıdan yeni bir Artikel ekleyin.")
 
 # --- 📜 GÜNLÜK ARŞİV SEKMESİ ---
 with sekme3:
-    st.markdown("### 📜 Gün Sonu ve Arşiv")
+    st.markdown("### 📜 Arşiv")
     if st.session_state["liste"]:
         csv = pd.DataFrame(st.session_state["liste"]).to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Verileri İndir (Excel/CSV)", data=csv, file_name=f"uretim_{datetime.now().strftime('%d_%m')}.csv")
-        
-        if st.button("🔴 TÜM LİSTEYİ TEMİZLE"):
+        st.download_button("📥 Verileri İndir (Excel/CSV)", data=csv, file_name="uretim.csv")
+        if st.button("🔴 LİSTEYE TEMİZLE"):
             st.session_state["liste"] = []
             st.rerun()
-    else:
-        st.info("Henüz kaydedilmiş bir üretim bulunmuyor.")
