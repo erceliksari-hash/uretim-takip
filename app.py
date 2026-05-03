@@ -4,38 +4,38 @@ from datetime import datetime
 import os
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Üretim Takip Pro v157", layout="wide")
+st.set_page_config(page_title="Üretim Takip Pro v158", layout="wide")
 
-# --- DOSYA DEPOLAMA SİSTEMİ (Korumalı) ---
+# --- DOSYA DEPOLAMA SİSTEMİ ---
 KUTUPHANE_DOSYASI = "artikel_kutuphanesi.csv"
 ARSIV_DOSYASI = "uretim_arsivi.csv"
 GUNCEL_LISTE_DOSYASI = "guncel_uretim.csv"
 
 def veri_yukle(dosya_adi):
     if os.path.exists(dosya_adi):
-        try:
-            return pd.read_csv(dosya_adi).to_dict('records')
-        except:
-            return []
+        try: return pd.read_csv(dosya_adi).to_dict('records')
+        except: return []
     return []
 
 def veri_kaydet(liste, dosya_adi):
-    if liste:
-        pd.DataFrame(liste).to_csv(dosya_adi, index=False)
+    if liste: pd.DataFrame(liste).to_csv(dosya_adi, index=False)
     else:
-        if os.path.exists(dosya_adi):
-            os.remove(dosya_adi)
+        if os.path.exists(dosya_adi): os.remove(dosya_adi)
 
-# --- CSS TASARIMI (Görsel 56.jpg ile birebir uyumlu) ---
+# --- CSS TASARIMI (Yeni Yerleşim ve Küçültülmüş Kutular) ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     div[data-testid="stVerticalBlock"] > div {
         background-color: #f6f8fa;
         border: 1px solid #d0d7de;
-        padding: 15px;
+        padding: 12px;
         border-radius: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
+    }
+    /* Sayı giriş kutularını biraz daha kompakt yapalım */
+    .stNumberInput div[data-baseweb="input"] {
+        height: 40px;
     }
     .stButton > button {
         width: 100% !important;
@@ -43,7 +43,6 @@ st.markdown("""
         font-weight: bold;
         border-radius: 6px;
     }
-    /* Buton Renkleri */
     .main-btn > div > button { background-color: #1f883d !important; color: white !important; }
     .archive-btn > div > button { background-color: #0969da !important; color: white !important; }
     .delete-btn > div > button { background-color: #cf222e !important; color: white !important; }
@@ -66,44 +65,39 @@ with sekme1:
     st.markdown("### 🚀 Yeni İş Girişi")
     
     with st.container():
-        # 1. Satır: Artikel Numarası (Tam Genişlik)
+        # 1. Artikel Seçimi
         art_sec = st.selectbox("Artikel Numarası", [""] + list(st.session_state["kutuphane"].keys()), 
                                index=0, key=f"art_{st.session_state['form_key']}")
         
-        # 2. Satır: Adet ve Veri Prosent (Yan Yana)
-        c1, c2 = st.columns(2)
-        with c1:
+        # 2. Ana Değerler (Yan Yana)
+        col_sol, col_sag = st.columns(2)
+        with col_sol:
             adet = st.number_input("Adet (STK)", min_value=0, value=None, key=f"adet_{st.session_state['form_key']}")
-        with c2:
-            verim = st.number_input("Veri Prosent", min_value=0.01, value=None, placeholder="Örn: 1.23", key=f"ver_{st.session_state['form_key']}")
-
-        # 3. Satır: TE Değeri ve Rüst (Yan Yana)
-        c3, c4 = st.columns(2)
-        with c3:
+            # TE DEĞERİ: Format %.2f ile iki basamağa sabitlendi
             v_te = st.session_state["kutuphane"].get(art_sec, None)
-            te_giris = st.number_input("TE Değeri", format="%.3f", value=v_te, key=f"te_{st.session_state['form_key']}")
-        with c4:
+            te_giris = st.number_input("TE Değeri", format="%.2f", value=v_te, key=f"te_{st.session_state['form_key']}")
+            
+        with col_sag:
+            verim = st.number_input("Veri Prosent", min_value=0.01, value=None, placeholder="Örn: 1.23", key=f"ver_{st.session_state['form_key']}")
+            # RÜST VE GMK ALT ALTA (Küçültülmüş yapı)
             rust = st.number_input("Rüst (Dk)", min_value=0.0, value=None, key=f"rust_{st.session_state['form_key']}")
+            gmk = st.number_input("GMK (Dk)", min_value=0.0, value=None, key=f"gmk_{st.session_state['form_key']}")
 
-        # 4. Satır: GMK
-        gmk = st.number_input("GMK (Dk)", min_value=0.0, value=None, key=f"gmk_{st.session_state['form_key']}")
-        
-        # 5. Satır: Not
-        notlar = st.text_input("Not / Auftrag", key=f"not_{st.session_state['form_key']}")
-
-        # --- OTOMATİK HESAPLAMA MANTIĞI ---
+        # HESAPLAMA MANTIĞI
         toplam_is_dk = 0.0
-        # Eğer Adet, TE ve Verim girilmişse hesapla
         if adet and te_giris and verim:
-            # Formül: (Adet * TE / Verim) + Rüst + GMK
             r_val = rust if rust else 0
             g_val = gmk if gmk else 0
+            # Formül: (Adet * TE / Verim) + Rüst + GMK
             hesap = (adet * te_giris) / verim
             toplam_is_dk = round(hesap + r_val + g_val, 2)
             
-            st.info(f"✨ Hesaplanan: {toplam_is_dk} dk")
+            st.info(f"📊 **Anlık Toplam:** {toplam_is_dk} dk")
 
-        # 6. Satır: Liste Ekle Butonu
+        # NOT KISMI (Hesaplamanın hemen altında)
+        notlar = st.text_area("Not / Auftrag", placeholder="İş emri veya özel notlar...", height=80, key=f"not_{st.session_state['form_key']}")
+
+        # EKLE BUTONU
         st.markdown('<div class="main-btn">', unsafe_allow_html=True)
         if st.button("LİSTEYE EKLE"):
             if adet and te_giris and verim:
@@ -111,35 +105,34 @@ with sekme1:
                     "Tarih": datetime.now().strftime("%Y-%m-%d"),
                     "Artikel No": art_sec or "Manuel",
                     "Adet": int(adet),
-                    "TE": round(te_giris, 3),
+                    "TE": round(te_giris, 2),
                     "Verim": verim,
                     "Toplam": toplam_is_dk,
                     "Not": notlar
                 }
                 st.session_state["liste"].insert(0, yeni)
                 veri_kaydet(st.session_state["liste"], GUNCEL_LISTE_DOSYASI)
-                st.session_state["form_key"] += 1 # Kutuları temizle
+                st.session_state["form_key"] += 1
                 st.rerun()
             else:
-                st.error("Lütfen Adet, Verim ve TE alanlarını doldurun!")
+                st.error("⚠️ Lütfen Adet, Verim ve TE alanlarını doldurun!")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- GÜNLÜK LİSTE VE HEDEF TABLOSU ---
+    # --- LİSTE VE HESAPLAR ---
     if st.session_state["liste"]:
         st.markdown("### 📊 Günlük Liste")
         df = pd.DataFrame(st.session_state["liste"])
         st.table(df[["Tarih", "Artikel No", "Adet", "Toplam", "Not"]])
         
         t_biriken = df["Toplam"].sum()
-        col_kalan, col_toplam = st.columns(2)
-        with col_kalan:
+        c_kalan, c_toplam = st.columns(2)
+        with c_kalan:
             hedef = st.number_input("Hedef Dakika", value=465)
             st.metric("KALAN", f"{round(hedef - t_biriken, 2)}")
-        with col_toplam:
+        with c_toplam:
             st.write("")
             st.metric("ŞU ANKİ TOPLAM", f"{round(t_biriken, 2)}")
 
-        # ARŞİV VE SİLME BUTONLARI
         c_alt1, c_alt2 = st.columns(2)
         with c_alt1:
             st.markdown('<div class="archive-btn">', unsafe_allow_html=True)
@@ -159,24 +152,22 @@ with sekme1:
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 🏷️ KÜTÜPHANE SEKİMESİ ---
+# Kütüphane ve Arşiv sekmeleri önceki kodunla aynı şekilde korunmuştur...
 with sekme2:
     st.markdown("### 🏷️ Artikel Kaydı")
     y_art = st.text_input("Artikel No").upper()
-    y_te = st.number_input("Standart TE", format="%.3f", value=0.0)
+    y_te = st.number_input("Standart TE (2 Basamak)", format="%.2f", value=0.0)
     if st.button("Kütüphaneye Kaydet"):
         if y_art and y_te > 0:
             st.session_state["kutuphane"][y_art] = y_te
             k_verisi = [{"Artikel": k, "TE": v} for k, v in st.session_state["kutuphane"].items()]
             veri_kaydet(k_verisi, KUTUPHANE_DOSYASI)
-            st.success("Kaydedildi!")
+            st.success("✅ Kaydedildi!")
             st.rerun()
-    
     if st.session_state["kutuphane"]:
         st.write("---")
         st.dataframe(pd.DataFrame([{"Artikel": k, "TE": v} for k, v in st.session_state["kutuphane"].items()]))
 
-# --- 📜 ARŞİV SEKMESİ ---
 with sekme3:
     st.markdown("### 🔍 Geçmiş Üretimler")
     arsiv_data = veri_yukle(ARSIV_DOSYASI)
@@ -184,14 +175,12 @@ with sekme3:
         df_arsiv = pd.DataFrame(arsiv_data)
         sec_tarih = st.date_input("Tarih Seç", datetime.now())
         t_ara = sec_tarih.strftime("%Y-%m-%d")
-        
         filtre = df_arsiv[df_arsiv["Tarih"] == t_ara]
         if not filtre.empty:
             st.table(filtre)
             st.metric("Gün Toplamı", f"{filtre['Toplam'].sum()}")
         else:
             st.warning("Bu tarihte kayıt yok.")
-        
         if st.checkbox("Tüm Arşivi Listele"):
             st.dataframe(df_arsiv)
     else:
